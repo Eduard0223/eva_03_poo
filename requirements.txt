@@ -1,0 +1,6 @@
+mysql-connector-python
+prettytable
+python-dateutil
+pandas
+requests
+pytest
