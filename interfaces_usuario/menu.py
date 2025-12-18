@@ -1,10 +1,17 @@
+import re
 import getpass
+
 from negocio.seguridad import Seguridad
-from datos.crud_usuarios import crear_usuario, obtener_usuario_por_username
+from datos.crud_usuarios import (
+    crear_usuario,
+    obtener_usuario_por_username,
+    obtener_usuario_por_email
+)
 from negocio.procesador_posts_comments import ProcesadorPostsComments
 from servicios.api_posts import ApiPosts
 from servicios.api_comments import ApiComments
 from auxiliares.constantes import DEFAULT_LIMIT
+
 
 
 def mostrar_menu():
@@ -18,23 +25,46 @@ def mostrar_menu():
 0) Salir
 """)
 
+def _email_valido(email: str) -> bool:
+    patron = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
+    return re.match(patron, email) is not None
+
 def registrar_usuario():
     username = input("Username: ").strip()
+    email = input("Email: ").strip()
+
+    print("(La contraseña no se mostrará mientras escribes)")
     password = getpass.getpass("Password: ")
 
-    if not username or not password:
-        print("Datos inválidos. Debe ingresar username y password.")
+    if not username or not email or not password:
+        print("Datos inválidos. Debe ingresar username, email y password.")
+        return
+
+    if not _email_valido(email):
+        print("Email inválido. Ejemplo válido: usuario@correo.com")
         return
 
     try:
+        # Validación extra (antes de insertar) para mensaje más claro
+        if obtener_usuario_por_username(username):
+            print("No se pudo registrar: el username ya existe.")
+            return
+
+        if obtener_usuario_por_email(email):
+            print("No se pudo registrar: el email ya existe.")
+            return
+
         password_hash = Seguridad.encriptar(password)
-        crear_usuario(username, password_hash)
+        crear_usuario(username, email, password_hash)
         print("Usuario registrado correctamente.")
     except Exception as e:
         print(f"No se pudo registrar el usuario: {e}")
 
+
 def login() -> bool:
     username = input("Username: ").strip()
+
+    print("(La contraseña no se mostrará mientras escribes)")
     password = getpass.getpass("Password: ")
 
     if not username or not password:
@@ -47,7 +77,7 @@ def login() -> bool:
             print("Usuario no existe.")
             return False
 
-        password_hash = row[2]
+        password_hash = row[3]  # id, username, email, password_hash
         if Seguridad.verificar(password, password_hash):
             print("Login correcto.")
             return True
@@ -58,6 +88,7 @@ def login() -> bool:
     except Exception as e:
         print(f"Error en login: {e}")
         return False
+
 
 def opcion_get_posts_comments():
     limit_str = input(f"Cantidad a mostrar desde DB (Enter = {DEFAULT_LIMIT}): ").strip()
